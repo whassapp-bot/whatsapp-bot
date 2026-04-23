@@ -3,12 +3,16 @@ const twilio = require('twilio');
 const nodemailer = require('nodemailer');
 const cron = require('node-cron');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Servir archivos estáticos (dashboard)
+app.use(express.static(path.join(__dirname)));
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -71,47 +75,172 @@ let projects = [
 
 let chatMessages = [];
 
-function processMessage(message) {
-  const msg = message.toLowerCase();
+// Procesar comandos de actualización
+function parseUpdateCommand(message) {
+  const msg = message.toLowerCase().trim();
+  
+  // Formato: "actualizar <proyecto> <campo> <valor>"
+  // Ejemplo: "actualizar 1 progreso 50"
+  // Ejemplo: "actualizar 2 estado en progreso"
+  
+  const parts = msg.split('|').map(p => p.trim());
+  
+  if (parts[0].includes('actualizar') && parts.length >= 2) {
+    return {
+      isUpdate: true,
+      projectId: parseInt(parts[0].split(' ')[1]),
+      field: parts[1] ? parts[1].toLowerCase() : null,
+      value: parts[2] || parts.slice(2).join(' ')
+    };
+  }
+  
+  return { isUpdate: false };
+}
 
+function updateProjectField(projectId, field, value) {
+  const projectIndex = projects.findIndex(p => p.id === projectId);
+  
+  if (projectIndex === -1) {
+    return { success: false, message: '❌ Proyecto no encontrado' };
+  }
+
+  const project = projects[projectIndex];
+  field = field.toLowerCase().trim();
+
+  switch(field) {
+    case 'progreso':
+    case 'progress':
+      const progress = parseInt(value);
+      if (isNaN(progress) || progress < 0 || progress > 100) {
+        return { success: false, message: '❌ El progreso debe ser un número entre 0 y 100' };
+      }
+      project.progress = progress;
+      return { success: true, message: `✅ Progreso actualizado a ${progress}%` };
+
+    case 'estado':
+    case 'status':
+      const validStates = ['por iniciar', 'en progreso', 'bloqueado', 'completado'];
+      if (!validStates.includes(value.toLowerCase())) {
+        return { success: false, message: '❌ Estados válidos: Por iniciar, En progreso, Bloqueado, Completado' };
+      }
+      project.status = value.charAt(0).toUpperCase() + value.slice(1);
+      return { success: true, message: `✅ Estado actualizado a: ${project.status}` };
+
+    case 'riesgo':
+    case 'risk':
+      const validRisks = ['bajo', 'medio', 'alto'];
+      if (!validRisks.includes(value.toLowerCase())) {
+        return { success: false, message: '❌ Riesgos válidos: BAJO, MEDIO, ALTO' };
+      }
+      project.riskLevel = value.toUpperCase();
+      return { success: true, message: `✅ Nivel de riesgo actualizado a: ${project.riskLevel}` };
+
+    case 'descripción':
+    case 'description':
+      project.description = value;
+      return { success: true, message: `✅ Descripción actualizada` };
+
+    case 'acción':
+    case 'action':
+    case 'agregar acción':
+      if (!project.nextActions) project.nextActions = [];
+      project.nextActions.push(value);
+      return { success: true, message: `✅ Acción agregada: "${value}"` };
+
+    case 'deadline':
+      project.deadline = value;
+      return { success: true, message: `✅ Deadline actualizado a: ${value}` };
+
+    default:
+      return { success: false, message: `❌ Campo no reconocido: ${field}` };
+  }
+}
+
+function processMessage(message) {
+  const msg = message.toLowerCase().trim();
+
+  // Verificar si es comando de actualización
+  if (msg.includes('actualizar')) {
+    // Formato mejorado: "actualizar proyecto 1 | progreso 50"
+    const lines = message.split('|').map(l => l.trim());
+    
+    if (lines.length >= 2) {
+      const firstLine = lines[0].toLowerCase();
+      const projectMatch = firstLine.match(/\d+/);
+      const projectId = projectMatch ? parseInt(projectMatch[0]) : null;
+
+      if (!projectId) {
+        return '❌ Formato incorrecto. Usa:\nactualizar proyecto 1 | progreso 50\nactualizar proyecto 2 | estado en progreso';
+      }
+
+      const project = projects.find(p => p.id === projectId);
+      if (!project) {
+        return `❌ Proyecto ${projectId} no encontrado`;
+      }
+
+      let responses = [`📝 Actualizando ${project.name}...\n`];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const [field, ...valueParts] = lines[i].split(' ');
+        const value = valueParts.join(' ');
+        
+        if (field && value) {
+          const result = updateProjectField(projectId, field, value);
+          responses.push(result.message);
+        }
+      }
+
+      return responses.join('\n');
+    }
+
+    // Formato antiguo
+    const parts = message.split(' ');
+    if (parts.length >= 4) {
+      const projectId = parseInt(parts[1]);
+      const field = parts[2];
+      const value = parts.slice(3).join(' ');
+      
+      const result = updateProjectField(projectId, field, value);
+      return result.message;
+    }
+
+    return `📝 COMANDO ACTUALIZAR
+Use este formato:
+actualizar proyecto 1 | progreso 50
+actualizar proyecto 1 | estado en progreso
+actualizar proyecto 2 | riesgo bajo
+actualizar proyecto 2 | acción Nueva acción importante`;
+  }
+
+  // Otros comandos
   if (msg.includes('hola') || msg.includes('hi') || msg.includes('inicio')) {
-    return `¡Hola! Soy tu bot de gestión de proyectos. Puedo ayudarte con:\n\n📋 Escribe:\n• "estado" - Ver estado de proyectos\n• "adidas" - Info Adidas Soleil\n• "avellaneda" - Info Alto Avellaneda\n• "reporte" - Generar reporte\n• "ayuda" - Ver todas las opciones`;
+    return `¡Hola! 👋 Soy tu bot de gestión de proyectos.\n\n📋 COMANDOS:\n• "estado" - Ver estado actual\n• "actualizar" - Actualizar proyecto\n• "adidas" - Info Adidas\n• "avellaneda" - Info Avellaneda\n• "reporte" - Enviar reporte\n• "ayuda" - Ver todas las opciones`;
   }
 
   if (msg.includes('estado') || msg.includes('proyectos')) {
-    return `📊 ESTADO DE PROYECTOS:\n\n🚀 Adidas Soleil:\nEstado: Por iniciar\nProgreso: 0%\nDeadline: 9 junio\n\n⏸️ Alto Avellaneda:\nEstado: Bloqueado\nProgreso: 15%\nEsperando: Carrefour y Rock&Fellers`;
+    return `📊 ESTADO DE PROYECTOS:\n\n🚀 ${projects[0].name}\nEstado: ${projects[0].status}\nProgreso: ${projects[0].progress}%\nRiesgo: ${projects[0].riskLevel}\n\n⏸️ ${projects[1].name}\nEstado: ${projects[1].status}\nProgreso: ${projects[1].progress}%\nRiesgo: ${projects[1].riskLevel}`;
   }
 
   if (msg.includes('adidas')) {
-    return `🚀 AMPLIACIÓN ADIDAS SOLEIL\n\n📅 Hitos:\n• Cateos: 24 abr (5-7 días)\n• Ingeniería: 30 días\n• Permiso: 45 días\n\n⚠️ Riesgo: ALTO (inicia viernes)\n\nPróximos pasos:\n✓ Confirmar equipo cateos\n✓ Verificar gestor permisos`;
+    const project = projects[0];
+    return `🚀 ${project.name}\n\nEstado: ${project.status}\nProgreso: ${project.progress}%\nRiesgo: ${project.riskLevel}\nDeadline: ${project.deadline}\n\nAcciones pendientes:\n${project.nextActions.map(a => '• ' + a).join('\n')}`;
   }
 
   if (msg.includes('avellaneda')) {
-    return `⏸️ AMPLIACIÓN ALTO AVELLANEDA\n\n📋 Aprobaciones pendientes:\n⏳ Carrefour - OK (PRIORITARIO)\n⏳ Rock&Fellers - Firma (PRIORITARIO)\n⏰ Grupo América - Cierre\n⏰ Grafo CAPEX - Cierre\n\n💬 Próxima acción:\nContactar a Carrefour y Rock&Fellers para confirmar timeline`;
+    const project = projects[1];
+    return `⏸️ ${project.name}\n\nEstado: ${project.status}\nProgreso: ${project.progress}%\nRiesgo: ${project.riskLevel}\n\nAcciones pendientes:\n${project.nextActions.map(a => '• ' + a).join('\n')}`;
   }
 
   if (msg.includes('reporte')) {
     generateAndSendReport();
-    return `📊 Reporte generado y enviado a lilyfn@gmail.com\n\n⏰ Próximo reporte automático: Mañana a las 16:00 hs`;
+    return `📊 Reporte enviado a lilyfn@gmail.com\n\n⏰ Próximos reportes automáticos:\n• 09:00 hs\n• 16:00 hs`;
   }
 
   if (msg.includes('ayuda')) {
-    return `❓ OPCIONES DISPONIBLES:\n\n• "estado" - Ver estado todos los proyectos\n• "adidas" - Detalles Ampliación Adidas\n• "avellaneda" - Detalles Alto Avellaneda\n• "cateos" - Info sobre cateos\n• "permiso" - Info sobre permiso de obra\n• "reporte" - Generar reporte ahora\n\n¿En qué puedo ayudarte?`;
+    return `❓ COMANDOS DISPONIBLES:\n\n📋 Información:\n• "estado" - Ver estado todos\n• "adidas" - Detalles Adidas\n• "avellaneda" - Detalles Avellaneda\n\n✏️ Actualizar:\n• "actualizar proyecto 1 | progreso 50"\n• "actualizar proyecto 1 | estado en progreso"\n• "actualizar proyecto 2 | riesgo bajo"\n• "actualizar proyecto 1 | acción Nueva tarea"\n\n📧 Reportes:\n• "reporte" - Enviar ahora`;
   }
 
-  if (msg.includes('cateos')) {
-    return `🔨 CATEOS DE ESTRUCTURAS\n\n📅 Fecha inicio: Viernes 24 de abril\n⏱️ Duración: ~5-7 días\n📍 Lugar: Adidas Soleil\n\n✓ Estado: Listo para iniciar\n✓ Equipo: Confirmado\n\n📊 Después de cateos: Comienza ingeniería (30 días)`;
-  }
-
-  if (msg.includes('permiso')) {
-    return `📜 PERMISO DE OBRA\n\n⏱️ Duración: 45 días desde inicio\n📅 Inicio: 24 de abril\n📅 Fin estimado: 8 de junio\n\n👤 Gestor: Confirmado\n⚠️ Riesgo: CRÍTICO (es bloqueante)\n\n💡 Recomendación: Monitorear progreso semanalmente`;
-  }
-
-  if (msg.includes('carrefour') || msg.includes('rock')) {
-    return `📧 SEGUIMIENTO APROBACIONES:\n\n⏳ Carrefour:\nEstado: En seguimiento\nAcción: Contactar para confirmar OK\n\n⏳ Rock&Fellers:\nEstado: En seguimiento\nAcción: Confirmar fecha de firma\n\n💬 ¿Quieres que envíe un email a alguno?`;
-  }
-
-  return `Entendido. Para más opciones, escribe "ayuda" o envía una de estas palabras clave:\n\nestado • adidas • avellaneda • reporte • cateos • permiso`;
+  return `Comando no reconocido. Escribe "ayuda" para ver opciones.`;
 }
 
 app.post('/api/whatsapp', (req, res) => {
@@ -127,7 +256,6 @@ app.post('/api/whatsapp', (req, res) => {
     phone: phoneNumber
   });
 
-  // Procesar y obtener respuesta
   let response = processMessage(incomingMessage);
 
   chatMessages.push({
@@ -137,29 +265,21 @@ app.post('/api/whatsapp', (req, res) => {
     phone: phoneNumber
   });
 
-  // Crear respuesta TwiML para Twilio
   const twiml = new twilio.twiml.MessagingResponse();
   twiml.message(response);
 
   res.type('text/xml');
   res.send(twiml.toString());
 
-  console.log(`✅ Mensaje respondido: ${response.substring(0, 50)}...`);
+  console.log(`✅ Respuesta enviada`);
 });
 
-app.get('/api/status', (req, res) => {
-  res.json({
-    status: 'Bot WhatsApp activo',
-    timestamp: new Date(),
-    projects: projects.length,
-    messages: chatMessages.length
-  });
-});
-
+// API para obtener proyectos
 app.get('/api/projects', (req, res) => {
   res.json(projects);
 });
 
+// API para actualizar proyectos desde web
 app.post('/api/projects/:id', (req, res) => {
   const { id } = req.params;
   const index = projects.findIndex(p => p.id == id);
@@ -169,6 +289,16 @@ app.post('/api/projects/:id', (req, res) => {
   } else {
     res.status(404).json({ error: 'Proyecto no encontrado' });
   }
+});
+
+// API de estado
+app.get('/api/status', (req, res) => {
+  res.json({
+    status: 'Bot WhatsApp activo',
+    timestamp: new Date(),
+    projects: projects.length,
+    messages: chatMessages.length
+  });
 });
 
 function generateDetailedReport() {
@@ -193,44 +323,34 @@ function generateDetailedReport() {
     .risk { font-weight: bold; padding: 3px 8px; border-radius: 3px; }
     .risk.high { background-color: #ffcdd2; color: #c62828; }
     .risk.medium { background-color: #ffe0b2; color: #e65100; }
-    .milestone { background-color: #e3f2fd; padding: 10px; margin: 8px 0; border-left: 3px solid #1976d2; border-radius: 3px; }
+    .risk.low { background-color: #c8e6c9; color: #2e7d32; }
     .action { background-color: #f3e5f5; padding: 8px 10px; margin: 5px 0; border-left: 3px solid #7b1fa2; border-radius: 3px; }
-    .approval { background-color: #e8f5e9; padding: 10px; margin: 8px 0; border-left: 3px solid #388e3c; border-radius: 3px; }
-    .timestamp { color: #666; font-size: 12px; text-align: right; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px; }
     .progress-bar { background-color: #e0e0e0; height: 20px; border-radius: 10px; overflow: hidden; margin: 10px 0; }
     .progress-fill { background-color: #4285f4; height: 100%; transition: width 0.3s; }
-    .summary { background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+    .timestamp { color: #666; font-size: 12px; text-align: right; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>📊 REPORTE DE PROYECTOS</h1>
     <p style="text-align: center; color: #666;"><strong>Fecha:</strong> ${date}</p>
-    
-    <div class="summary">
-      <h3 style="margin-top: 0;">📈 Resumen General</h3>
-      <p><strong>Total de proyectos:</strong> ${projects.length}</p>
-      <p><strong>Proyectos activos:</strong> ${projects.filter(p => p.status !== 'Bloqueado').length}</p>
-      <p><strong>Proyectos bloqueados:</strong> ${projects.filter(p => p.status === 'Bloqueado').length}</p>
-    </div>
   `;
 
-  // Agregar cada proyecto
-  projects.forEach((project, index) => {
+  projects.forEach((project) => {
     reportHTML += `
     <div class="project">
-      <h2>${index + 1}. ${project.name}</h2>
+      <h2>${project.name}</h2>
       
       <p>
         <strong>Estado:</strong> 
-        <span class="status ${project.status === 'Por iniciar' ? 'pending' : project.status === 'Bloqueado' ? 'blocked' : 'active'}">
+        <span class="status ${project.status === 'Bloqueado' ? 'blocked' : project.status === 'Completado' ? 'active' : 'pending'}">
           ${project.status}
         </span>
       </p>
       
       <p>
         <strong>Riesgo:</strong> 
-        <span class="risk ${project.riskLevel === 'ALTO' ? 'high' : 'medium'}">
+        <span class="risk ${project.riskLevel === 'ALTO' ? 'high' : project.riskLevel === 'MEDIO' ? 'medium' : 'low'}">
           ${project.riskLevel}
         </span>
       </p>
@@ -242,48 +362,19 @@ function generateDetailedReport() {
       
       <p><strong>Descripción:</strong> ${project.description}</p>
       <p><strong>Deadline:</strong> ${project.deadline}</p>
+      
+      ${project.nextActions && project.nextActions.length > 0 ? `
+        <h3>🎯 Acciones Pendientes:</h3>
+        ${project.nextActions.map(action => `<div class="action">▶ ${action}</div>`).join('')}
+      ` : ''}
+    </div>
     `;
-
-    // Hitos (Milestones)
-    if (project.milestones && project.milestones.length > 0) {
-      reportHTML += '<h3>📅 Hitos:</h3>';
-      project.milestones.forEach(milestone => {
-        reportHTML += `
-        <div class="milestone">
-          <strong>${milestone.name}</strong> | ${milestone.date} | Duración: ${milestone.duration}
-        </div>
-        `;
-      });
-    }
-
-    // Aprobaciones
-    if (project.approvals && project.approvals.length > 0) {
-      reportHTML += '<h3>✅ Aprobaciones:</h3>';
-      project.approvals.forEach(approval => {
-        let statusClass = approval.status === 'OK' ? 'active' : 'pending';
-        reportHTML += `
-        <div class="approval">
-          <strong>${approval.name}</strong> | Estado: <span class="status ${statusClass}">${approval.status}</span> | Prioridad: ${approval.priority}
-        </div>
-        `;
-      });
-    }
-
-    // Acciones pendientes
-    if (project.nextActions && project.nextActions.length > 0) {
-      reportHTML += '<h3>🎯 Acciones Pendientes:</h3>';
-      project.nextActions.forEach(action => {
-        reportHTML += `<div class="action">▶ ${action}</div>`;
-      });
-    }
-
-    reportHTML += '</div>'; // Cerrar proyecto
   });
 
   reportHTML += `
     <div class="timestamp">
       <p>Reporte generado: ${timestamp}</p>
-      <p style="margin: 10px 0 0 0; font-size: 11px; color: #999;">Próximo reporte automático: Mañana a las 16:00 hs</p>
+      <p style="margin: 10px 0 0 0; font-size: 11px; color: #999;">Próximos reportes: 09:00 hs y 16:00 hs</p>
     </div>
   </div>
 </body>
@@ -313,15 +404,13 @@ function generateAndSendReport() {
   });
 }
 
-// Reportes automáticos: Diariamente a las 16:00 hs
-cron.schedule('0 16 * * *', () => {
-  console.log('⏰ [16:00 hs] Generando reporte automático diario...');
+cron.schedule('0 9 * * *', () => {
+  console.log('⏰ [09:00 hs] Generando reporte automático...');
   generateAndSendReport();
 });
 
-// También a las 9:00 hs (opcional)
-cron.schedule('0 9 * * *', () => {
-  console.log('⏰ [09:00 hs] Generando reporte automático matutino...');
+cron.schedule('0 16 * * *', () => {
+  console.log('⏰ [16:00 hs] Generando reporte automático...');
   generateAndSendReport();
 });
 
@@ -330,6 +419,7 @@ app.listen(PORT, () => {
   console.log(`\n✅ SERVIDOR INICIADO`);
   console.log(`📌 Puerto: ${PORT}`);
   console.log(`🤖 Bot WhatsApp: ACTIVO`);
-  console.log(`📧 Reportes automáticos: 09:00 hs y 16:00 hs diarios`);
+  console.log(`📧 Reportes automáticos: 09:00 hs y 16:00 hs`);
+  console.log(`🌐 Dashboard: /dashboard.html`);
   console.log(`\n⏳ Esperando mensajes de WhatsApp...\n`);
 });
