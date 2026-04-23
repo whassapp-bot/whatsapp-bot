@@ -1,0 +1,31 @@
+# Dependencias
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Variables de entorno (NUNCA subir a Git)
+.env
+.env.local
+.env.*.local
+
+# Archivos de sistema
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Logs
+logs/
+*.log
+
+# OS
+Thumbs.db
+
+# Temporal
+tmp/
+temp/
