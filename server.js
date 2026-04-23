@@ -23,22 +23,49 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Base de datos de proyectos
 let projects = [
   {
     id: 1,
     name: 'Ampliación Adidas Soleil',
     status: 'Por iniciar',
     progress: 0,
+    startDate: '2026-04-24',
     deadline: '2026-06-09',
-    description: 'Cateos + Ingeniería (30 días) + Permiso (45 días)'
+    riskLevel: 'ALTO',
+    description: 'Cateos + Ingeniería (30 días) + Permiso (45 días)',
+    milestones: [
+      { name: 'Cateos de estructuras', date: '2026-04-24', duration: '5-7 días', status: 'pendiente' },
+      { name: 'Ingeniería', date: '2026-05-01', duration: '30 días', status: 'pendiente' },
+      { name: 'Permiso de obra', date: '2026-04-24', duration: '45 días', status: 'pendiente' }
+    ],
+    nextActions: [
+      'Confirmar equipo de cateos',
+      'Verificar gestor de permisos',
+      'Coordinar fechas con cliente'
+    ]
   },
   {
     id: 2,
     name: 'Ampliación Alto Avellaneda',
     status: 'Bloqueado',
     progress: 15,
+    startDate: '2026-04-15',
     deadline: 'TBD',
-    description: 'Esperando Carrefour y Rock&Fellers'
+    riskLevel: 'MEDIO',
+    description: 'Esperando aprobaciones de stakeholders',
+    approvals: [
+      { name: 'Carrefour', status: 'OK', priority: 'PRIORITARIO' },
+      { name: 'Rock&Fellers', status: 'Pendiente firma', priority: 'PRIORITARIO' },
+      { name: 'Grupo América', status: 'En proceso', priority: 'normal' },
+      { name: 'Grafo CAPEX', status: 'En proceso', priority: 'normal' }
+    ],
+    nextActions: [
+      'Contactar a Carrefour para confirmar OK',
+      'Enviar documentos a Rock&Fellers para firma',
+      'Seguimiento con Grupo América',
+      'Cerrar CAPEX con Grafo'
+    ]
   }
 ];
 
@@ -144,44 +171,137 @@ app.post('/api/projects/:id', (req, res) => {
   }
 });
 
-function generateReport() {
+function generateDetailedReport() {
   const timestamp = new Date().toLocaleString('es-AR');
-  return `
-═══════════════════════════════════════
-📊 REPORTE AUTOMÁTICO DE PROYECTOS
-═══════════════════════════════════════
-Generado: ${timestamp}
-
-🚀 AMPLIACIÓN ADIDAS SOLEIL
-Estado: Por iniciar (0%)
-Hitos:
-  • Cateos: 24 abr (5-7 días)
-  • Ingeniería: 30 días
-  • Permiso: 45 días - CRÍTICO
-Próxima acción: Iniciar viernes 24
-
-⏸️ AMPLIACIÓN ALTO AVELLANEDA
-Estado: Bloqueado (15%)
-Aprobaciones pendientes:
-  • Carrefour (PRIORITARIO)
-  • Rock&Fellers (PRIORITARIO)
-  • Grupo América
-  • Grafo CAPEX
-Próxima acción: Contactar Carrefour y Rock&Fellers
-
-═══════════════════════════════════════
-Próximo reporte: Mañana a las 16:00 hs
+  const date = new Date().toLocaleDateString('es-AR');
+  
+  let reportHTML = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h1 { color: #1a73e8; text-align: center; border-bottom: 3px solid #1a73e8; padding-bottom: 10px; }
+    h2 { color: #1a73e8; margin-top: 30px; border-left: 4px solid #1a73e8; padding-left: 10px; }
+    .project { background-color: #f9f9f9; padding: 20px; margin: 15px 0; border-left: 5px solid #4285f4; border-radius: 4px; }
+    .status { display: inline-block; padding: 5px 10px; border-radius: 4px; font-weight: bold; margin: 5px 0; }
+    .status.active { background-color: #34a853; color: white; }
+    .status.blocked { background-color: #ea4335; color: white; }
+    .status.pending { background-color: #fbbc04; color: black; }
+    .risk { font-weight: bold; padding: 3px 8px; border-radius: 3px; }
+    .risk.high { background-color: #ffcdd2; color: #c62828; }
+    .risk.medium { background-color: #ffe0b2; color: #e65100; }
+    .milestone { background-color: #e3f2fd; padding: 10px; margin: 8px 0; border-left: 3px solid #1976d2; border-radius: 3px; }
+    .action { background-color: #f3e5f5; padding: 8px 10px; margin: 5px 0; border-left: 3px solid #7b1fa2; border-radius: 3px; }
+    .approval { background-color: #e8f5e9; padding: 10px; margin: 8px 0; border-left: 3px solid #388e3c; border-radius: 3px; }
+    .timestamp { color: #666; font-size: 12px; text-align: right; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px; }
+    .progress-bar { background-color: #e0e0e0; height: 20px; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+    .progress-fill { background-color: #4285f4; height: 100%; transition: width 0.3s; }
+    .summary { background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 REPORTE DE PROYECTOS</h1>
+    <p style="text-align: center; color: #666;"><strong>Fecha:</strong> ${date}</p>
+    
+    <div class="summary">
+      <h3 style="margin-top: 0;">📈 Resumen General</h3>
+      <p><strong>Total de proyectos:</strong> ${projects.length}</p>
+      <p><strong>Proyectos activos:</strong> ${projects.filter(p => p.status !== 'Bloqueado').length}</p>
+      <p><strong>Proyectos bloqueados:</strong> ${projects.filter(p => p.status === 'Bloqueado').length}</p>
+    </div>
   `;
+
+  // Agregar cada proyecto
+  projects.forEach((project, index) => {
+    reportHTML += `
+    <div class="project">
+      <h2>${index + 1}. ${project.name}</h2>
+      
+      <p>
+        <strong>Estado:</strong> 
+        <span class="status ${project.status === 'Por iniciar' ? 'pending' : project.status === 'Bloqueado' ? 'blocked' : 'active'}">
+          ${project.status}
+        </span>
+      </p>
+      
+      <p>
+        <strong>Riesgo:</strong> 
+        <span class="risk ${project.riskLevel === 'ALTO' ? 'high' : 'medium'}">
+          ${project.riskLevel}
+        </span>
+      </p>
+      
+      <p><strong>Progreso:</strong> ${project.progress}%</p>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: ${project.progress}%"></div>
+      </div>
+      
+      <p><strong>Descripción:</strong> ${project.description}</p>
+      <p><strong>Deadline:</strong> ${project.deadline}</p>
+    `;
+
+    // Hitos (Milestones)
+    if (project.milestones && project.milestones.length > 0) {
+      reportHTML += '<h3>📅 Hitos:</h3>';
+      project.milestones.forEach(milestone => {
+        reportHTML += `
+        <div class="milestone">
+          <strong>${milestone.name}</strong> | ${milestone.date} | Duración: ${milestone.duration}
+        </div>
+        `;
+      });
+    }
+
+    // Aprobaciones
+    if (project.approvals && project.approvals.length > 0) {
+      reportHTML += '<h3>✅ Aprobaciones:</h3>';
+      project.approvals.forEach(approval => {
+        let statusClass = approval.status === 'OK' ? 'active' : 'pending';
+        reportHTML += `
+        <div class="approval">
+          <strong>${approval.name}</strong> | Estado: <span class="status ${statusClass}">${approval.status}</span> | Prioridad: ${approval.priority}
+        </div>
+        `;
+      });
+    }
+
+    // Acciones pendientes
+    if (project.nextActions && project.nextActions.length > 0) {
+      reportHTML += '<h3>🎯 Acciones Pendientes:</h3>';
+      project.nextActions.forEach(action => {
+        reportHTML += `<div class="action">▶ ${action}</div>`;
+      });
+    }
+
+    reportHTML += '</div>'; // Cerrar proyecto
+  });
+
+  reportHTML += `
+    <div class="timestamp">
+      <p>Reporte generado: ${timestamp}</p>
+      <p style="margin: 10px 0 0 0; font-size: 11px; color: #999;">Próximo reporte automático: Mañana a las 16:00 hs</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  return reportHTML;
 }
 
 function generateAndSendReport() {
-  const report = generateReport();
+  const reportHTML = generateDetailedReport();
+  const date = new Date().toLocaleDateString('es-AR');
 
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: 'lilyfn@gmail.com',
-    subject: `📊 Reporte Proyectos - ${new Date().toLocaleDateString('es-AR')} ${new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`,
-    text: report
+    subject: `📊 Reporte de Proyectos - ${date}`,
+    html: reportHTML
   };
 
   transporter.sendMail(mailOptions, (err, info) => {
@@ -193,8 +313,15 @@ function generateAndSendReport() {
   });
 }
 
+// Reportes automáticos: Diariamente a las 16:00 hs
 cron.schedule('0 16 * * *', () => {
   console.log('⏰ [16:00 hs] Generando reporte automático diario...');
+  generateAndSendReport();
+});
+
+// También a las 9:00 hs (opcional)
+cron.schedule('0 9 * * *', () => {
+  console.log('⏰ [09:00 hs] Generando reporte automático matutino...');
   generateAndSendReport();
 });
 
@@ -203,6 +330,6 @@ app.listen(PORT, () => {
   console.log(`\n✅ SERVIDOR INICIADO`);
   console.log(`📌 Puerto: ${PORT}`);
   console.log(`🤖 Bot WhatsApp: ACTIVO`);
-  console.log(`📧 Reportes automáticos: Diariamente a las 16:00 hs`);
+  console.log(`📧 Reportes automáticos: 09:00 hs y 16:00 hs diarios`);
   console.log(`\n⏳ Esperando mensajes de WhatsApp...\n`);
 });
