@@ -10,17 +10,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ============================================
-// CONFIGURACIÓN TWILIO
-// ============================================
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 const client = twilio(accountSid, authToken);
 
-// ============================================
-// CONFIGURACIÓN EMAIL
-// ============================================
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -29,9 +23,6 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// ============================================
-// BASE DE DATOS EN MEMORIA
-// ============================================
 let projects = [
   {
     id: 1,
@@ -53,58 +44,9 @@ let projects = [
 
 let chatMessages = [];
 
-// ============================================
-// WEBHOOK PARA RECIBIR MENSAJES DE WHATSAPP
-// ============================================
-app.post('/api/whatsapp', (req, res) => {
-  const incomingMessage = req.body.Body;
-  const phoneNumber = req.body.From;
-
-  console.log(`📱 Mensaje recibido de ${phoneNumber}: ${incomingMessage}`);
-
-  // Guardar mensaje del usuario
-  chatMessages.push({
-    type: 'user',
-    text: incomingMessage,
-    timestamp: new Date(),
-    phone: phoneNumber
-  });
-
-  // Procesar mensaje y generar respuesta
-  let response = processMessage(incomingMessage);
-
-  // Guardar respuesta
-  chatMessages.push({
-    type: 'bot',
-    text: response,
-    timestamp: new Date(),
-    phone: phoneNumber
-  });
-
-  // Enviar respuesta por WhatsApp
-  client.messages
-    .create({
-      body: response,
-      from: `whatsapp:${twilioWhatsAppNumber}`,
-      to: phoneNumber
-    })
-    .then(message => {
-      console.log(`✅ Mensaje enviado: ${message.sid}`);
-      res.status(200).send('OK');
-    })
-    .catch(err => {
-      console.error('❌ Error enviando mensaje:', err);
-      res.status(500).send('Error');
-    });
-});
-
-// ============================================
-// FUNCIÓN PROCESAR MENSAJES
-// ============================================
 function processMessage(message) {
   const msg = message.toLowerCase();
 
-  // Casos de uso
   if (msg.includes('hola') || msg.includes('hi') || msg.includes('inicio')) {
     return `¡Hola! Soy tu bot de gestión de proyectos. Puedo ayudarte con:\n\n📋 Escribe:\n• "estado" - Ver estado de proyectos\n• "adidas" - Info Adidas Soleil\n• "avellaneda" - Info Alto Avellaneda\n• "reporte" - Generar reporte\n• "ayuda" - Ver todas las opciones`;
   }
@@ -142,15 +84,42 @@ function processMessage(message) {
     return `📧 SEGUIMIENTO APROBACIONES:\n\n⏳ Carrefour:\nEstado: En seguimiento\nAcción: Contactar para confirmar OK\n\n⏳ Rock&Fellers:\nEstado: En seguimiento\nAcción: Confirmar fecha de firma\n\n💬 ¿Quieres que envíe un email a alguno?`;
   }
 
-  // Respuesta por defecto
   return `Entendido. Para más opciones, escribe "ayuda" o envía una de estas palabras clave:\n\nestado • adidas • avellaneda • reporte • cateos • permiso`;
 }
 
-// ============================================
-// ENDPOINTS API
-// ============================================
+app.post('/api/whatsapp', (req, res) => {
+  const incomingMessage = req.body.Body;
+  const phoneNumber = req.body.From;
 
-// GET: Obtener estado general
+  console.log(`📱 Mensaje recibido de ${phoneNumber}: ${incomingMessage}`);
+
+  chatMessages.push({
+    type: 'user',
+    text: incomingMessage,
+    timestamp: new Date(),
+    phone: phoneNumber
+  });
+
+  // Procesar y obtener respuesta
+  let response = processMessage(incomingMessage);
+
+  chatMessages.push({
+    type: 'bot',
+    text: response,
+    timestamp: new Date(),
+    phone: phoneNumber
+  });
+
+  // Crear respuesta TwiML para Twilio
+  const twiml = new twilio.twiml.MessagingResponse();
+  twiml.message(response);
+
+  res.type('text/xml');
+  res.send(twiml.toString());
+
+  console.log(`✅ Mensaje respondido: ${response.substring(0, 50)}...`);
+});
+
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'Bot WhatsApp activo',
@@ -160,12 +129,10 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// GET: Obtener proyectos
 app.get('/api/projects', (req, res) => {
   res.json(projects);
 });
 
-// POST: Actualizar proyecto
 app.post('/api/projects/:id', (req, res) => {
   const { id } = req.params;
   const index = projects.findIndex(p => p.id == id);
@@ -177,9 +144,6 @@ app.post('/api/projects/:id', (req, res) => {
   }
 });
 
-// ============================================
-// FUNCIÓN GENERAR Y ENVIAR REPORTE
-// ============================================
 function generateReport() {
   const timestamp = new Date().toLocaleString('es-AR');
   return `
@@ -229,17 +193,11 @@ function generateAndSendReport() {
   });
 }
 
-// ============================================
-// CRON: REPORTES AUTOMÁTICOS DIARIAMENTE A LAS 16:00
-// ============================================
 cron.schedule('0 16 * * *', () => {
   console.log('⏰ [16:00 hs] Generando reporte automático diario...');
   generateAndSendReport();
 });
 
-// ============================================
-// INICIAR SERVIDOR
-// ============================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`\n✅ SERVIDOR INICIADO`);
