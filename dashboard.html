@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Proyectos - Gestión</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.5em;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 25px;
+      margin-bottom: 30px;
+    }
+
+    .project-card {
+      background: white;
+      border-radius: 12px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .project-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+    }
+
+    .project-card h2 {
+      color: #667eea;
+      margin-bottom: 15px;
+      font-size: 1.5em;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #333;
+      font-weight: 600;
+      font-size: 0.9em;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 0.95em;
+      transition: border-color 0.3s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .progress-section {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+    }
+
+    .progress-bar {
+      background: #e0e0e0;
+      height: 30px;
+      border-radius: 15px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+
+    .progress-fill {
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 0.85em;
+      transition: width 0.3s;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-save {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-save:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .action-item {
+      background: #f0f0f0;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .action-item button {
+      padding: 5px 10px;
+      font-size: 0.8em;
+      background: #ff6b6b;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .add-button {
+      background: #4CAF50;
+      color: white;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+      margin-top: 8px;
+      width: 100%;
+    }
+
+    .add-button:hover {
+      background: #45a049;
+    }
+
+    .message {
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      display: none;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .message.success {
+      background: #c8e6c9;
+      color: #2e7d32;
+      display: block;
+    }
+
+    .message.error {
+      background: #ffcdd2;
+      color: #c62828;
+      display: block;
+    }
+
+    .info-box {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .info-box h3 {
+      color: #667eea;
+      margin-bottom: 15px;
+    }
+
+    .info-box p {
+      color: #666;
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 768px) {
+      .projects-grid {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 1.8em;
+      }
+
+      .button-group {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Panel de Gestión de Proyectos</h1>
+
+    <div id="message" class="message"></div>
+
+    <div class="projects-grid" id="projectsContainer"></div>
+
+    <div class="info-box">
+      <h3>📋 ¿Cómo usar este panel?</h3>
+      <p><strong>✏️ 1. Actualiza la información:</strong> Cambia el estado, progreso, hitos y acciones de cada proyecto aquí.</p>
+      <p><strong>💾 2. Haz clic en "Guardar Cambios":</strong> Los cambios se guardan automáticamente en el servidor.</p>
+      <p><strong>📧 3. Reportes automáticos:</strong> Cada día a las 09:00 hs y 16:00 hs recibirás un email con toda esta información actualizada.</p>
+      <p><strong>➕ 4. Agregar acciones:</strong> Usa el campo de texto para agregar nuevas acciones pendientes.</p>
+      <p style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; color: #999; font-size: 0.9em;">
+        💡 Este panel se conecta directamente con tu bot. Cuando guardas cambios, el próximo reporte incluirá toda la información actualizada.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = window.location.origin + '/api/projects';
+
+    async function loadProjects() {
+      try {
+        const projectsResponse = await fetch(API_URL);
+        const projects = await projectsResponse.json();
+        renderProjects(projects);
+      } catch (error) {
+        console.error('Error:', error);
+        showMessage('Error al cargar proyectos', 'error');
+      }
+    }
+
+    function renderProjects(projects) {
+      const container = document.getElementById('projectsContainer');
+      container.innerHTML = '';
+
+      projects.forEach(project => {
+        const projectHTML = `
+          <div class="project-card">
+            <h2>${project.name}</h2>
+
+            <div class="form-group">
+              <label>Estado:</label>
+              <select class="project-status" data-id="${project.id}">
+                <option value="Por iniciar" ${project.status === 'Por iniciar' ? 'selected' : ''}>Por iniciar</option>
+                <option value="En progreso" ${project.status === 'En progreso' ? 'selected' : ''}>En progreso</option>
+                <option value="Bloqueado" ${project.status === 'Bloqueado' ? 'selected' : ''}>Bloqueado</option>
+                <option value="Completado" ${project.status === 'Completado' ? 'selected' : ''}>Completado</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Nivel de Riesgo:</label>
+              <select class="project-risk" data-id="${project.id}">
+                <option value="BAJO" ${project.riskLevel === 'BAJO' ? 'selected' : ''}>BAJO</option>
+                <option value="MEDIO" ${project.riskLevel === 'MEDIO' ? 'selected' : ''}>MEDIO</option>
+                <option value="ALTO" ${project.riskLevel === 'ALTO' ? 'selected' : ''}>ALTO</option>
+              </select>
+            </div>
+
+            <div class="progress-section">
+              <label>Progreso: <span class="progress-value">${project.progress}</span>%</label>
+              <input type="range" min="0" max="100" value="${project.progress}" class="project-progress" data-id="${project.id}" style="width: 100%; cursor: pointer;">
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${project.progress}%">
+                  ${project.progress}%
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Descripción:</label>
+              <textarea rows="3" class="project-description" data-id="${project.id}">${project.description}</textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Deadline:</label>
+              <input type="date" class="project-deadline" data-id="${project.id}" value="${project.deadline}">
+            </div>
+
+            <div class="form-group">
+              <label>Fecha de Inicio:</label>
+              <input type="date" class="project-startDate" data-id="${project.id}" value="${project.startDate}">
+            </div>
+
+            <div class="form-group">
+              <label>🎯 Acciones Pendientes:</label>
+              <div class="actions-list" data-id="${project.id}">
+                ${(project.nextActions || []).map((action, idx) => `
+                  <div class="action-item">
+                    <span>${action}</span>
+                    <button type="button" onclick="removeAction(${project.id}, ${idx})">✕ Eliminar</button>
+                  </div>
+                `).join('')}
+              </div>
+              <input type="text" placeholder="Nueva acción..." class="new-action" data-id="${project.id}">
+              <button type="button" class="add-button" onclick="addAction(${project.id})">➕ Agregar Acción</button>
+            </div>
+
+            <div class="button-group">
+              <button class="btn-save" onclick="saveProject(${project.id})">💾 Guardar Cambios</button>
+            </div>
+          </div>
+        `;
+        
+        container.innerHTML += projectHTML;
+      });
+
+      // Event listeners para actualizar preview de progreso
+      document.querySelectorAll('.project-progress').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const projectCard = e.target.closest('.project-card');
+          const progressValue = projectCard.querySelector('.progress-value');
+          const progressFill = projectCard.querySelector('.progress-fill');
+          progressValue.textContent = e.target.value;
+          progressFill.style.width = e.target.value + '%';
+          progressFill.textContent = e.target.value + '%';
+        });
+      });
+    }
+
+    function addAction(projectId) {
+      const input = document.querySelector(`.new-action[data-id="${projectId}"]`);
+      const action = input.value.trim();
+      
+      if (!action) {
+        showMessage('Por favor escribe una acción', 'error');
+        return;
+      }
+
+      const actionsList = document.querySelector(`.actions-list[data-id="${projectId}"]`);
+      
+      const newActionHTML = `
+        <div class="action-item">
+          <span>${action}</span>
+          <button type="button" onclick="this.parentElement.remove()">✕ Eliminar</button>
+        </div>
+      `;
+      
+      actionsList.innerHTML += newActionHTML;
+      input.value = '';
+    }
+
+    function removeAction(projectId, index) {
+      const actionsList = document.querySelector(`.actions-list[data-id="${projectId}"]`);
+      const items = actionsList.querySelectorAll('.action-item');
+      if (items[index]) {
+        items[index].remove();
+      }
+    }
+
+    async function saveProject(projectId) {
+      try {
+        const searchCard = Array.from(document.querySelectorAll('.project-card')).find(c => 
+          c.querySelector(`.project-status[data-id="${projectId}"]`)
+        );
+
+        if (!searchCard) return;
+
+        const status = searchCard.querySelector('.project-status').value;
+        const progress = parseInt(searchCard.querySelector('.project-progress').value);
+        const description = searchCard.querySelector('.project-description').value;
+        const deadline = searchCard.querySelector('.project-deadline').value;
+        const startDate = searchCard.querySelector('.project-startDate').value;
+        const riskLevel = searchCard.querySelector('.project-risk').value;
+
+        const actions = Array.from(searchCard.querySelectorAll('.action-item span')).map(span => span.textContent);
+
+        const updateData = {
+          status,
+          progress,
+          description,
+          deadline,
+          startDate,
+          riskLevel,
+          nextActions: actions
+        };
+
+        const response = await fetch(`${API_URL}/${projectId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updateData)
+        });
+
+        if (response.ok) {
+          showMessage('✅ Proyecto guardado exitosamente. Los reportes incluirán estos cambios.', 'success');
+        } else {
+          showMessage('Error al guardar el proyecto', 'error');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        showMessage('Error al guardar. Intenta de nuevo.', 'error');
+      }
+    }
+
+    function showMessage(text, type) {
+      const messageEl = document.getElementById('message');
+      messageEl.textContent = text;
+      messageEl.className = `message ${type}`;
+      
+      setTimeout(() => {
+        messageEl.className = 'message';
+      }, 4000);
+    }
+
+    // Cargar proyectos al abrir la página
+    loadProjects();
+  </script>
+</body>
+</html>
