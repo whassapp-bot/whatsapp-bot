@@ -404,15 +404,14 @@ function generateAndSendReport() {
   });
 }
 
-cron.schedule('0 9 * * *', () => {
-  console.log('⏰ [09:00 hs] Generando reporte automático...');
-  generateAndSendReport();
-});
-
-cron.schedule('0 16 * * *', () => {
-  console.log('⏰ [16:00 hs] Generando reporte automático...');
-  generateAndSendReport();
-});
+// cron.schedule('0 9 * * *', () => {
+//   console.log('⏰ [09:00 hs] Generando reporte automático...');
+//   generateAndSendReport();
+// });
+// cron.schedule('0 16 * * *', () => {
+//   console.log('⏰ [16:00 hs] Generando reporte automático...');
+//   generateAndSendReport();
+// });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
