@@ -18,7 +18,7 @@ const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 const client = twilio(accountSid, authToken);
 
 // BREVO REST API - SIN SMTP
-const BREVO_API_KEY = 'xsmtpsib-85313f88f9f403141dd7b5ec7983f16e7f88eb729587263edcbfd5794b93c99d-LgvCfTMMzYaY6mTm';
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 // PROYECTOS
