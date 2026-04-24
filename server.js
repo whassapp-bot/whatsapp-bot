@@ -45,22 +45,7 @@ let projects = [
     description: 'Esperando Carrefour y Rock&Fellers',
     location: 'Alto Avellaneda',
     budget: 'TBD',
-    approvals: ['Carrefour - PRIORITARIO', 'Rock&Fellers - PRIORITARIO', 'Grupo Americana', 'Grafo CAPEX']
-  }
-ayuda: {
-    keywords: ['ayuda', 'help', 'comandos'],
-    response: `📋 COMANDOS DISPONIBLES:
-- "hola" - Saludo
-- "estado" - Estado de proyectos
-- "adidas" - Info Adidas Soleil
-- "avellaneda" - Info Alto Avellaneda
-- "ayuda" - Ver esta lista`
-  },
-  reporte: {
-    keywords: ['reporte', 'report'],
-    response: `📊 REPORTE:
-Visita tu dashboard para ver reportes detallados:
-https://whatsapp-bot-production-8eaf.up.railway.app/dashboard.html`
+    approvals: ['Carrefour - PRIORITARIO', 'Rock&Fellers - PRIORITARIO', 'Grupo América', 'Grafo CAPEX']
   }
 ];
 
